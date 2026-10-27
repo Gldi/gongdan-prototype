@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>우리 인력사무소 · 화면 시안</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#home"><span class="brand-mark">인</span><span>우리 인력사무소<small>매일의 일을 한곳에서</small></span></a>
+    <nav aria-label="주 메뉴">
+      <a href="#home">오늘의 업무</a><a href="#work">작업내역</a><a href="#workers">근로자</a><a href="#clients">거래처·현장</a><a href="#payroll">급여 정산</a><a href="#claims">작업확인서</a><a href="#settings">설정</a>
+    </nav>
+    <p class="sidebar-note">화면 검토용 시안<br>표시된 사람과 금액은 가상 자료입니다.</p>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><span>업무 공간 <span class="pill">화면 시안</span></span><span id="today"></span></header>
+    <div class="notice">입력한 내용은 이 화면을 열어둔 동안만 유지됩니다. 새로고침하거나 닫으면 초기화됩니다.</div>
+    <main id="content" tabindex="-1"></main>
+    <footer>우리 인력사무소 · 화면 구성 검토 중</footer>
+  </div>
+  <dialog id="work-dialog" aria-labelledby="dialog-title">
+    <form id="work-form">
+      <div class="dialog-heading"><h2 id="dialog-title">작업 등록</h2><button type="button" id="close-dialog" class="quiet" aria-label="닫기">닫기</button></div>
+      <p class="muted">가상 작업을 입력하고 목록에서 확인해 보세요.</p>
+      <label>작업일<input name="date" type="date" required></label>
+      <label>현장<select name="site" required></select></label>
+      <label>근로자<select name="worker" required></select></label>
+      <div class="form-grid"><label>공수<input name="units" type="number" min="0.01" step="any" required value="1"></label><label>적용 일당(원)<input name="rate" type="number" min="0" step="1" required></label></div>
+      <label class="check"><input name="vehicle" type="checkbox">회사 차량 이용</label>
+      <p class="muted">공수 허용 범위와 공제 규칙은 확인 중입니다. 이 시안에서는 급여를 확정하지 않습니다.</p>
+      <p id="form-error" role="alert"></p>
+      <div class="actions"><button type="button" id="cancel-dialog" class="secondary">취소</button><button type="submit">시안에 추가</button></div>
+    </form>
+  </dialog>
+  <dialog id="worker-dialog" aria-labelledby="worker-dialog-title">
+    <form id="worker-form">
+      <div class="dialog-heading"><h2 id="worker-dialog-title">근로자 등록</h2><button type="button" id="close-worker-dialog" class="quiet" aria-label="닫기">닫기</button></div>
+      <p class="muted">근로자 기본정보를 입력하세요. 연락처·직종·계좌는 비워둘 수 있습니다.</p>
+      <input name="id" type="hidden">
+      <label>이름<input name="name" type="text" required maxlength="40"></label>
+      <div class="form-grid">
+        <label>연락처<input name="phone" type="text" placeholder="010-0000-0000" maxlength="20"></label>
+        <label>직종<input name="trade" type="text" placeholder="예: 일반, 기능" maxlength="20"></label>
+      </div>
+      <div class="form-grid">
+        <label>계좌<input name="account" type="text" placeholder="은행 · 계좌번호" maxlength="40"></label>
+        <label>기본 일당(원)<input name="rate" type="number" min="0" step="1" required></label>
+      </div>
+      <p id="worker-form-error" role="alert"></p>
+      <div class="actions"><button type="button" id="cancel-worker-dialog" class="secondary">취소</button><button type="submit">저장</button></div>
+    </form>
+  </dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
