@@ -17,7 +17,7 @@ const workerDialog = document.querySelector("#worker-dialog");
 const workerForm = document.querySelector("#worker-form");
 document.querySelector("#today").textContent = now.toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"});
 const themeToggle = document.querySelector("#theme-toggle");
-themeToggle.addEventListener("click",()=>{const on=document.documentElement.classList.toggle("inverted");themeToggle.setAttribute("aria-pressed",String(on));themeToggle.textContent=on?"원래 색":"색 반전";});
+themeToggle.addEventListener("click",()=>{const on=document.documentElement.classList.toggle("inverted");themeToggle.setAttribute("aria-pressed",String(on));themeToggle.innerHTML=on?'<span aria-hidden="true">☀️</span> 원래 색':'<span aria-hidden="true">🌙</span> 색 반전';});
 const heading = (title,description,action="") => `<div class="page-heading"><div><div class="eyebrow">우리 인력사무소</div><h1>${title}</h1><p class="muted">${description}</p></div>${action}</div>`;
 const addButton = '<button data-action="add">＋ 작업 등록</button>';
 const table = (headers,rows) => `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join("")}</tr></thead><tbody>${rows.length?rows.join(""):`<tr><td class="empty" colspan="${headers.length}">표시할 내역이 없습니다.</td></tr>`}</tbody></table></div>`;

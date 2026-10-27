@@ -64,9 +64,12 @@ async function run(){
  assert.equal(await evaluate('document.documentElement.classList.contains("inverted")'),false);
  await evaluate('document.querySelector("#theme-toggle").click()');
  assert.equal(await evaluate('document.documentElement.classList.contains("inverted")'),true);
- assert.equal(await evaluate('document.querySelector("#theme-toggle").textContent'),'원래 색');
+ assert.match(await evaluate('document.querySelector("#theme-toggle").textContent'),/☀️.*원래 색/);
+ assert.equal(await evaluate('document.querySelector("#theme-toggle").getAttribute("aria-pressed")'),'true');
  await evaluate('document.querySelector("#theme-toggle").click()');
  assert.equal(await evaluate('document.documentElement.classList.contains("inverted")'),false);
+ assert.match(await evaluate('document.querySelector("#theme-toggle").textContent'),/🌙.*색 반전/);
+ assert.equal(await evaluate('document.querySelector("#theme-toggle").getAttribute("aria-pressed")'),'false');
  await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  for(const route of ['home','work','workers','clients','payroll','claims','settings']){await evaluate(`location.hash=${JSON.stringify(route)}`);await delay(80);assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'),true,`휴대폰 가로 넘침: ${route}`);}
  await call('Page.reload');await delay(300);
