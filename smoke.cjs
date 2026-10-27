@@ -61,12 +61,18 @@ async function run(){
  await evaluate('document.querySelector("[data-action=add]").click()');
  assert.equal(await evaluate('document.querySelector("#work-form").elements.worker.options.length'),3);
  await evaluate('document.querySelector("#close-dialog").click()');
+ assert.equal(await evaluate('document.documentElement.classList.contains("inverted")'),false);
+ await evaluate('document.querySelector("#theme-toggle").click()');
+ assert.equal(await evaluate('document.documentElement.classList.contains("inverted")'),true);
+ assert.equal(await evaluate('document.querySelector("#theme-toggle").textContent'),'원래 색');
+ await evaluate('document.querySelector("#theme-toggle").click()');
+ assert.equal(await evaluate('document.documentElement.classList.contains("inverted")'),false);
  await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  for(const route of ['home','work','workers','clients','payroll','claims','settings']){await evaluate(`location.hash=${JSON.stringify(route)}`);await delay(80);assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'),true,`휴대폰 가로 넘침: ${route}`);}
  await call('Page.reload');await delay(300);
  assert.equal(await evaluate('entries.length'),3);
  assert.deepEqual(errors,[]);
- console.log('통과: 7개 메뉴, 작업 추가, 중복 차단, 필터, 급여 반영, 확정 차단, 근로자 등록·수정·비활성화, 휴대폰 너비, 새로고침 초기화, 실행 오류 없음');
+ console.log('통과: 7개 메뉴, 작업 추가, 중복 차단, 필터, 급여 반영, 확정 차단, 근로자 등록·수정·비활성화, 색 반전 토글, 휴대폰 너비, 새로고침 초기화, 실행 오류 없음');
  await call('Browser.close').catch(()=>{});
 }
 run().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{if(ws)ws.close();if(child&&child.exitCode===null){child.kill();await delay(700);}try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}catch{console.error(`검증용 프로필 정리 필요: ${profile}`);process.exitCode=1;}});
