@@ -2,7 +2,6 @@
 const now = new Date();
 const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 const workers = [{id:"w1",name:"근로자 가",phone:"010-0000-0001",trade:"일반",account:"",rate:150000,active:true},{id:"w2",name:"근로자 나",phone:"010-0000-0002",trade:"일반",account:"",rate:160000,active:true},{id:"w3",name:"근로자 다",phone:"010-0000-0003",trade:"기능",account:"",rate:180000,active:true}];
-let nextWorkerId = workers.length + 1;
 const clients = [
   {id:"c1",name:"거래처 가",contact:"",phone:"",businessNumber:"",active:true},
   {id:"c2",name:"거래처 나",contact:"",phone:"",businessNumber:"",active:true},
@@ -12,6 +11,94 @@ const sites = [
   {id:"s2",name:"나 현장",clientId:"c2",address:"",active:true},
 ];
 const entries = [{date:today,worker:"w1",site:"s1",units:1,rate:150000,vehicle:true},{date:today,worker:"w2",site:"s1",units:0.5,rate:160000,vehicle:false},{date:today,worker:"w3",site:"s2",units:1,rate:180000,vehicle:true}];
+const storageKey = "gongdan-prototype:data";
+const storageVersion = 1;
+const data = {workers,clients,sites,entries};
+const sampleData = JSON.stringify(data);
+const storageNotice = document.querySelector("#storage-notice");
+
+function showStorageNotice(message) {
+  storageNotice.textContent = message;
+  storageNotice.hidden = !message;
+}
+
+function validRate(rate) {
+  return Number.isSafeInteger(rate) && rate>=0;
+}
+
+function validRecords(rows, prefix, textFields) {
+  return Array.isArray(rows) && rows.every((row,index)=>row &&
+    row.id===prefix+(index+1) && typeof row.active==="boolean" &&
+    typeof row.name==="string" && row.name.trim() &&
+    textFields.every(field=>typeof row[field]==="string"));
+}
+
+function validSnapshot(snapshot) {
+  if (snapshot?.version!==storageVersion) return false;
+  const {workers,clients,sites,entries} = snapshot;
+  if (!validRecords(workers,"w",["phone","trade","account"]) ||
+      !workers.every(w=>validRate(w.rate)) ||
+      !validRecords(clients,"c",["contact","phone","businessNumber"]) || !clients.length ||
+      !validRecords(sites,"s",["address","clientId"]) || !Array.isArray(entries)) return false;
+  const workerIds = new Set(workers.map(w=>w.id));
+  const clientIds = new Set(clients.map(c=>c.id));
+  const siteIds = new Set(sites.map(s=>s.id));
+  return sites.every(s=>clientIds.has(s.clientId)) && entries.every(e=>e &&
+    workerIds.has(e.worker) && siteIds.has(e.site) &&
+    typeof e.date==="string" && /^\d{4,}-\d{2}-\d{2}$/.test(e.date) &&
+    Number.isFinite(e.units) && e.units>0 && validRate(e.rate) && Number.isFinite(e.units*e.rate) &&
+    typeof e.vehicle==="boolean" && (e.cancelled===undefined || typeof e.cancelled==="boolean"));
+}
+
+function replaceData(snapshot) {
+  for (const [key,rows] of Object.entries(data)) {
+    rows.length = 0;
+    for (const row of snapshot[key]) rows.push(row);
+  }
+}
+
+function loadData() {
+  let stored;
+  try {
+    stored = window.localStorage.getItem(storageKey);
+  } catch {
+    showStorageNotice("브라우저 저장소를 읽을 수 없어 가상 데이터를 표시합니다.");
+    return;
+  }
+  if (stored===null) return;
+  try {
+    const snapshot = JSON.parse(stored);
+    if (!validSnapshot(snapshot)) throw new Error("지원하지 않는 저장 형식");
+    replaceData(snapshot);
+  } catch {
+    showStorageNotice("저장 데이터가 손상되었거나 지원하지 않는 형식이어서 가상 데이터를 표시합니다.");
+  }
+}
+
+function saveData() {
+  try {
+    window.localStorage.setItem(storageKey,JSON.stringify({version:storageVersion,...data}));
+    showStorageNotice("");
+  } catch {
+    showStorageNotice("브라우저에 저장하지 못했습니다. 이번 변경은 현재 화면에서만 유지됩니다.");
+  }
+}
+
+function resetData() {
+  if (!window.confirm("입력한 업무 데이터를 지우고 가상 데이터로 복구할까요?")) return;
+  replaceData(JSON.parse(sampleData));
+  editingEntries = [];
+  try {
+    window.localStorage.removeItem(storageKey);
+    showStorageNotice("데이터를 초기화했습니다. 가상 데이터를 표시합니다.");
+  } catch {
+    showStorageNotice("현재 화면을 가상 데이터로 복구했습니다. 브라우저 저장 데이터를 지우지 못해 새로고침하면 이전 데이터가 다시 표시될 수 있습니다.");
+  }
+  render();
+  content.focus();
+}
+
+loadData();
 const activeEntries = () => entries.filter(entry=>!entry.cancelled);
 const titles = {home:"오늘의 업무",work:"작업내역",workers:"근로자",clients:"거래처·현장",payroll:"급여 정산",claims:"작업확인서",settings:"설정"};
 const esc = value => String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -62,7 +149,7 @@ function work() {
     </section>`;
 }
 function workerRow(w){return `<tr><td><strong>${esc(w.name)}</strong></td><td>${esc(w.phone||"-")}</td><td>${esc(w.trade||"-")}</td><td>${esc(w.account||"-")}</td><td class="number">${money(w.rate)}원</td><td>${entries.filter(e=>e.worker===w.id).length}건</td><td><span class="badge ${w.active?"":"pending"}">${w.active?"활동 중":"비활성"}</span></td><td class="row-actions"><button class="secondary" data-action="edit-worker" data-id="${w.id}">수정</button><button class="quiet" data-action="toggle-worker" data-id="${w.id}">${w.active?"비활성화":"활성화"}</button></td></tr>`;}
-function workerPage(){return heading("근로자","기본 일당과 작업 이력을 관리하는 화면입니다.",'<button data-action="add-worker">＋ 근로자 등록</button>')+`<section class="panel"><div class="panel-heading"><h2>등록 근로자 <span class="badge">가상 자료</span></h2></div>${table(["이름","연락처","직종","계좌","기본 일당","등록 작업","상태",""],workers.map(workerRow))}</section>`;}
+function workerPage(){return heading("근로자","기본 일당과 작업 이력을 관리하는 화면입니다.",'<button data-action="add-worker">＋ 근로자 등록</button>')+`<section class="panel"><div class="panel-heading"><h2>등록 근로자</h2></div>${table(["이름","연락처","직종","계좌","기본 일당","등록 작업","상태",""],workers.map(workerRow))}</section>`;}
 function recordActions(kind, record) {
   return `<td class="row-actions">
     <button class="secondary" data-record="${kind}" data-action="edit-record" data-id="${record.id}">수정</button>
@@ -93,7 +180,7 @@ function clientsPage() {
 }
 function payroll(){return heading("급여 정산","작업내역을 바탕으로 근로자별 금액을 확인합니다.")+`<div class="info"><strong>공제 규칙 확인 후 정산할 수 있습니다.</strong><p class="muted">아래는 전체 예시 작업의 일당 × 공수 합계입니다. 수수료·차량비·기타 항목과 원 단위 처리 전 금액이며 실지급액이 아닙니다.</p></div><section class="panel"><div class="panel-heading"><h2>근로자별 정산 틀</h2><button disabled>급여 확정 · 규칙 확인 필요</button></div>${table(["근로자","공수 합계","공제 전 계산값","수수료 / 차량비","실지급액"],workers.map(w=>{const rows=activeEntries().filter(e=>e.worker===w.id);return `<tr><td>${esc(w.name)}</td><td>${money(rows.reduce((s,e)=>s+e.units,0))}</td><td>${money(rows.reduce((s,e)=>s+e.rate*e.units,0))}원</td><td>확인 필요</td><td>미확정</td></tr>`;}))}</section>`;}
 function claims(){return heading("작업확인서","거래처에 전달할 작업 내역의 구성 예시입니다.")+`<div class="info"><strong>기존 양식과 청구단가를 확인 중입니다.</strong><p class="muted">아래는 ${esc(client("c1").name)}의 미발행 초안입니다. 근로자 공제내역과 개인 계좌는 표시하지 않습니다.</p></div><section class="panel"><div class="panel-heading"><h2>문서 미리보기</h2><button disabled>발행 · 양식 확인 필요</button></div><div class="document"><h2>작업확인서</h2><p class="draft">화면 검토용 · 미발행</p><p><strong>${esc(client("c1").name)} 귀중</strong><br>발행자: 우리 인력사무소(예시)<br>대상: ${esc(client("c1").name)}의 전체 예시 작업</p>${table(["작업일","현장","근로자","공수","청구금액"],activeEntries().filter(e=>site(e.site).clientId==="c1").map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(site(e.site).name)}</td><td>${esc(person(e.worker).name)}</td><td>${e.units}</td><td>단가 확인 필요</td></tr>`))}<p style="text-align:right;margin-top:20px"><strong>총 청구액: 미확정</strong></p></div></section>`;}
-function settings(){return heading("설정","업무 기본값과 사용자 관리를 구성할 공간입니다.")+`<section class="panel"><h2>확인할 기본값</h2>${table(["항목","현재 상태"],["일일 수수료","차량 이용료","공수·반나절 처리","급여 지급 주기","원 단위 처리","사용자별 권한"].map(label=>`<tr><td>${label}</td><td><span class="badge pending">업무 답변 대기</span></td></tr>`))}</section><section class="panel"><h2>이 시안에서 가능한 일</h2><ul class="settings-list"><li>메뉴 이동과 PC·휴대폰 화면 구성 확인</li><li>가상 작업 등록·수정·취소, 조건별 조회, 공제 전 계산값 확인</li></ul><p class="muted">로그인, 영구 저장, 두 기기 간 공유, 급여 확정, 문서 발행은 아직 연결하지 않았습니다. 실제 개인정보는 입력하지 마세요.</p></section>`;}
+function settings(){return heading("설정","업무 기본값과 사용자 관리를 구성할 공간입니다.")+`<section class="panel"><h2>확인할 기본값</h2>${table(["항목","현재 상태"],["일일 수수료","차량 이용료","공수·반나절 처리","급여 지급 주기","원 단위 처리","사용자별 권한"].map(label=>`<tr><td>${label}</td><td><span class="badge pending">업무 답변 대기</span></td></tr>`))}</section><section class="panel"><h2>이 시안에서 가능한 일</h2><ul class="settings-list"><li>메뉴 이동과 PC·휴대폰 화면 구성 확인</li><li>가상 작업 등록·수정·취소, 조건별 조회, 공제 전 계산값 확인</li></ul><p class="muted">실제 개인정보는 입력하지 마세요.</p></section><section class="panel"><h2>데이터 저장</h2><p>이 기기·이 브라우저에만 저장됩니다. 다른 기기와 공유되지 않습니다.</p><p class="muted">초기화하면 입력한 업무 데이터를 지우고 처음의 가상 데이터로 복구합니다.</p><button class="secondary" data-action="reset-data">데이터 초기화</button></section>`;}
 const pages={home,work,workers:workerPage,clients:clientsPage,payroll,claims,settings};
 function render(){const key=location.hash.slice(1);const route=pages[key]?key:"home";content.innerHTML=pages[route]();document.title=`${titles[route]} · 우리 인력사무소`;document.querySelectorAll("nav a").forEach(a=>{if(a.hash===`#${route}`)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});}
 function filter() {
@@ -163,7 +250,7 @@ function refreshWork() {
   else render();
 }
 function openWorkerForm(id){workerForm.reset();document.querySelector("#worker-form-error").textContent="";const w=id?person(id):null;document.querySelector("#worker-dialog-title").textContent=w?"근로자 수정":"근로자 등록";workerForm.elements.id.value=w?w.id:"";workerForm.elements.name.value=w?w.name:"";workerForm.elements.phone.value=w?w.phone||"":"";workerForm.elements.trade.value=w?w.trade||"":"";workerForm.elements.account.value=w?w.account||"":"";workerForm.elements.rate.value=w?w.rate:"";workerDialog.showModal();}
-content.addEventListener("click",event=>{const target=event.target.closest("[data-action]");const action=target?.dataset.action;if(action==="add-worker")openWorkerForm();if(action==="edit-worker")openWorkerForm(target.dataset.id);if(action==="toggle-worker"){const w=person(target.dataset.id);if(!w)return;w.active=!w.active;render();const toast=document.querySelector("#toast");toast.textContent=`${w.name}의 상태를 ${w.active?"활동 중":"비활성"}으로 변경했습니다. 실제 저장은 아닙니다.`;toast.style.display="block";setTimeout(()=>{toast.style.display="none";},4000);}});
+content.addEventListener("click",event=>{const target=event.target.closest("[data-action]");const action=target?.dataset.action;if(action==="add-worker")openWorkerForm();if(action==="edit-worker")openWorkerForm(target.dataset.id);if(action==="toggle-worker"){const w=person(target.dataset.id);if(!w)return;w.active=!w.active;saveData();render();const toast=document.querySelector("#toast");toast.textContent=`${w.name}의 상태를 ${w.active?"활동 중":"비활성"}으로 변경했습니다.`;toast.style.display="block";setTimeout(()=>{toast.style.display="none";},4000);}});
 content.addEventListener("change",event=>{if(event.target.id.startsWith("filter-"))filter();});
 content.addEventListener("click",event=>{
   const button = event.target.closest("[data-action]");
@@ -178,10 +265,14 @@ content.addEventListener("click",event=>{
       const entry = entries[button.dataset.index];
       if (window.confirm(`${entry.date} · ${site(entry.site).name} · ${person(entry.worker).name} 작업을 취소할까요?`)) {
         entry.cancelled = true;
+        saveData();
         refreshWork();
       }
       break;
     }
+    case "reset-data":
+      resetData();
+      break;
     case "reset-filter":
       document.querySelectorAll(".filters input, .filters select").forEach(field=>{field.value="";});
       filter();
@@ -244,10 +335,11 @@ form.addEventListener("submit",event=>{
     if (index<editingEntries.length) Object.assign(editingEntries[index],row);
     else entries.push(row);
   });
+  saveData();
   dialog.close();
   refreshWork();
 });
-workerForm.addEventListener("submit",event=>{event.preventDefault();if(!workerForm.reportValidity())return;const values=new FormData(workerForm);const id=values.get("id");const name=values.get("name").trim();const rate=Number(values.get("rate"));const error=document.querySelector("#worker-form-error");if(!name){error.textContent="이름을 입력하세요.";return;}if(!Number.isSafeInteger(rate)||rate<0){error.textContent="기본 일당에 올바른 숫자를 입력하세요.";return;}const fields={name,phone:values.get("phone").trim(),trade:values.get("trade").trim(),account:values.get("account").trim(),rate};if(id){const existing=person(id);if(!existing){error.textContent="대상 근로자를 찾을 수 없습니다.";return;}Object.assign(existing,fields);}else{workers.push({id:`w${nextWorkerId++}`,active:true,...fields});}workerDialog.close();render();const toast=document.querySelector("#toast");toast.textContent=id?"시안에서 근로자 정보를 수정했습니다. 실제 저장은 아닙니다.":"시안에 근로자를 등록했습니다. 실제 저장은 아닙니다.";toast.style.display="block";setTimeout(()=>{toast.style.display="none";},4000);});
+workerForm.addEventListener("submit",event=>{event.preventDefault();if(!workerForm.reportValidity())return;const values=new FormData(workerForm);const id=values.get("id");const name=values.get("name").trim();const rate=Number(values.get("rate"));const error=document.querySelector("#worker-form-error");if(!name){error.textContent="이름을 입력하세요.";return;}if(!Number.isSafeInteger(rate)||rate<0){error.textContent="기본 일당에 올바른 숫자를 입력하세요.";return;}const fields={name,phone:values.get("phone").trim(),trade:values.get("trade").trim(),account:values.get("account").trim(),rate};if(id){const existing=person(id);if(!existing){error.textContent="대상 근로자를 찾을 수 없습니다.";return;}Object.assign(existing,fields);}else{workers.push({id:`w${workers.length+1}`,active:true,...fields});}saveData();workerDialog.close();render();const toast=document.querySelector("#toast");toast.textContent=id?"근로자 정보를 수정했습니다.":"근로자를 등록했습니다.";toast.style.display="block";setTimeout(()=>{toast.style.display="none";},4000);});
 const recordTypes = {
   client:{label:"거래처",rows:clients,prefix:"c",fields:["name","contact","phone","businessNumber"]},
   site:{label:"현장",rows:sites,prefix:"s",fields:["name","address","clientId"]},
@@ -264,6 +356,7 @@ for (const [kind,type] of Object.entries(recordTypes)) {
     const record = type.rows.find(row=>row.id===button.dataset.id);
     if (button.dataset.action==="toggle-record") {
       record.active = !record.active;
+      saveData();
       render();
       return;
     }
@@ -302,6 +395,7 @@ for (const [kind,type] of Object.entries(recordTypes)) {
     }
     if (record) Object.assign(record,fields);
     else type.rows.push({id:`${type.prefix}${type.rows.length+1}`,active:true,...fields});
+    saveData();
     recordDialog.close();
     render();
   });
