@@ -208,13 +208,65 @@ async function run(){
  assert.equal(await evaluate('document.querySelector("#theme-toggle").getAttribute("aria-pressed")'),'false');
  await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  for(const route of ['home','work','workers','clients','payroll','claims','settings']){await evaluate(`location.hash=${JSON.stringify(route)}`);await delay(80);assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'),true,`휴대폰 가로 넘침: ${route}`);}
- await call('Page.reload');await delay(300);
- assert.equal(await evaluate('entries.length'),3);
- assert.equal(await evaluate('clients.length'),2);
- assert.equal(await evaluate('sites.length'),2);
- assert.equal(await evaluate('clients.every(c=>c.active) && sites.every(s=>s.active)'),true);
+ async function reload(){
+  const loaded=new Promise(resolve=>{
+   function onMessage(event){
+    if(JSON.parse(event.data).method!=='Page.loadEventFired')return;
+    ws.removeEventListener('message',onMessage);
+    resolve();
+   }
+   ws.addEventListener('message',onMessage);
+  });
+  await call('Page.reload');
+  await loaded;
+ }
+ const snapshot = ()=>evaluate('JSON.parse(JSON.stringify(data))');
+ const modified = await snapshot();
+ await reload();
+ assert.deepEqual(await snapshot(),modified);
+ assert.equal(await evaluate('entries[4].cancelled'),true);
+ assert.equal(await evaluate('JSON.parse(localStorage.getItem(storageKey)).version'),1);
+ assert.match(await evaluate('document.querySelector("#content").textContent'),/이 기기·이 브라우저에만 저장됩니다.*다른 기기와 공유되지 않습니다/);
+
+ async function reset(confirmed){
+  await evaluate(`{
+   const confirm=window.confirm;
+   try {
+    window.confirm=()=>${confirmed};
+    document.querySelector('[data-action="reset-data"]').click();
+   } finally { window.confirm=confirm; }
+  }`);
+ }
+ await reset(false);
+ assert.deepEqual(await snapshot(),modified);
+ await reset(true);
+ const samples=await evaluate('JSON.parse(sampleData)');
+ assert.deepEqual(await snapshot(),samples);
+ assert.equal(await evaluate('localStorage.getItem(storageKey)'),null);
+ assert.match(await evaluate('document.querySelector("#storage-notice").textContent'),/초기화했습니다/);
+ await reload();
+ assert.deepEqual(await snapshot(),samples);
+
+ for(const invalid of ['{',JSON.stringify({version:999,...modified}),
+  JSON.stringify({version:1,...modified,sites:[{...modified.sites[0],clientId:'c999'}]})]){
+  await evaluate(`localStorage.setItem(storageKey,${JSON.stringify(invalid)})`);
+  await reload();
+  assert.deepEqual(await snapshot(),samples);
+  assert.match(await evaluate('document.querySelector("#storage-notice").textContent'),/손상되었거나 지원하지 않는 형식/);
+ }
+ const {identifier}=await call('Page.addScriptToEvaluateOnNewDocument',{
+  source:'Object.defineProperty(window,"localStorage",{get(){throw new DOMException("Blocked","SecurityError");}});'
+ });
+ await reload();
+ assert.deepEqual(await snapshot(),samples);
+ assert.match(await evaluate('document.querySelector("#storage-notice").textContent'),/저장소를 읽을 수 없어/);
+ await evaluate('location.hash="workers"');await delay(100);
+ await evaluate('document.querySelector("[data-action=toggle-worker]").click()');
+ assert.equal(await evaluate('workers[0].active'),false);
+ assert.match(await evaluate('document.querySelector("#storage-notice").textContent'),/저장하지 못했습니다/);
+ await call('Page.removeScriptToEvaluateOnNewDocument',{identifier});
  assert.deepEqual(errors,[]);
- console.log('통과: 7개 메뉴, 작업 등록·다중 근로자·수정·취소, 등록·수정 중복 차단, 조회 필터, 급여 반영, 확정 차단, 근로자 등록·수정·비활성화, 거래처·현장 등록·빈 이름 검증·수정·비활성화·작업 선택 목록, 색 반전 토글, 휴대폰 너비, 새로고침 초기화, 실행 오류 없음');
+ console.log('통과: 7개 메뉴, 작업 등록·다중 근로자·수정·취소, 등록·수정 중복 차단, 조회 필터, 급여 반영, 확정 차단, 근로자 등록·수정·비활성화, 거래처·현장 등록·빈 이름 검증·수정·비활성화·작업 선택 목록, 색 반전 토글, 휴대폰 너비, 새로고침 후 데이터 유지, 초기화 확인·취소, 손상·형식 불일치 복구, 저장소 접근 차단, 실행 오류 없음');
  await call('Browser.close').catch(()=>{});
 }
 run().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{if(ws)ws.close();if(child&&child.exitCode===null){child.kill();await delay(700);}try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}catch{console.error(`검증용 프로필 정리 필요: ${profile}`);process.exitCode=1;}});

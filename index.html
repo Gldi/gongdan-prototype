@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>우리 인력사무소 · 화면 시안</title>
-  <link rel="stylesheet" href="styles.css?v=5">
-  <script src="app.js?v=5" defer></script>
+  <link rel="stylesheet" href="styles.css?v=6">
+  <script src="app.js?v=6" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -17,7 +17,8 @@
   </aside>
   <div class="workspace">
     <header class="topbar"><span>업무 공간 <span class="pill">화면 시안</span></span><span class="topbar-right"><span id="today"></span><button id="theme-toggle" class="secondary" type="button" aria-pressed="false"><span aria-hidden="true">🌙</span> 색 반전</button></span></header>
-    <div class="notice">입력한 내용은 이 화면을 열어둔 동안만 유지됩니다. 새로고침하거나 닫으면 초기화됩니다.</div>
+    <div class="notice">이 기기·이 브라우저에만 저장됩니다. 실제 개인정보는 입력하지 마세요.</div>
+    <div id="storage-notice" class="notice" role="status" hidden></div>
     <main id="content" tabindex="-1"></main>
     <footer>우리 인력사무소 · 화면 구성 검토 중</footer>
   </div>
