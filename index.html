@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>우리 인력사무소 · 화면 시안</title>
-  <link rel="stylesheet" href="styles.css?v=4">
-  <script src="app.js?v=4" defer></script>
+  <link rel="stylesheet" href="styles.css?v=5">
+  <script src="app.js?v=5" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -24,15 +24,17 @@
   <dialog id="work-dialog" aria-labelledby="dialog-title">
     <form id="work-form">
       <div class="dialog-heading"><h2 id="dialog-title">작업 등록</h2><button type="button" id="close-dialog" class="quiet" aria-label="닫기">닫기</button></div>
-      <p class="muted">가상 작업을 입력하고 목록에서 확인해 보세요.</p>
+      <p id="work-dialog-description" class="muted"></p>
       <label>작업일<input name="date" type="date" required></label>
-      <label>현장<select name="site" required></select></label>
-      <label>근로자<select name="worker" required></select></label>
-      <div class="form-grid"><label>공수<input name="units" type="number" min="0.01" step="any" required value="1"></label><label>적용 일당(원)<input name="rate" type="number" min="0" step="1" required></label></div>
-      <label class="check"><input name="vehicle" type="checkbox">회사 차량 이용</label>
+      <div class="form-grid">
+        <label>거래처<select name="clientId" required></select></label>
+        <label>현장<select name="site" required></select></label>
+      </div>
+      <div id="work-rows"></div>
+      <button type="button" id="add-work-row" class="secondary">＋ 근로자 추가</button>
       <p class="muted">공수 허용 범위와 공제 규칙은 확인 중입니다. 이 시안에서는 급여를 확정하지 않습니다.</p>
       <p id="form-error" role="alert"></p>
-      <div class="actions"><button type="button" id="cancel-dialog" class="secondary">취소</button><button type="submit">시안에 추가</button></div>
+      <div class="actions"><button type="button" id="cancel-dialog" class="secondary">취소</button><button type="submit">저장</button></div>
     </form>
   </dialog>
   <dialog id="worker-dialog" aria-labelledby="worker-dialog-title">
