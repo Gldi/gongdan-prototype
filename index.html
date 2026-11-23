@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>우리 인력사무소 · 화면 시안</title>
-  <link rel="stylesheet" href="styles.css?v=3">
-  <script src="app.js?v=3" defer></script>
+  <link rel="stylesheet" href="styles.css?v=4">
+  <script src="app.js?v=4" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -51,6 +51,29 @@
       </div>
       <p id="worker-form-error" role="alert"></p>
       <div class="actions"><button type="button" id="cancel-worker-dialog" class="secondary">취소</button><button type="submit">저장</button></div>
+    </form>
+  </dialog>
+  <dialog id="client-dialog" aria-labelledby="client-dialog-title">
+    <form id="client-form">
+      <div class="dialog-heading"><h2 id="client-dialog-title">거래처 등록</h2><button type="button" class="quiet" data-close>닫기</button></div>
+      <input name="id" type="hidden">
+      <label>거래처명<input name="name" type="text" required maxlength="60"></label>
+      <label>담당자<input name="contact" type="text" maxlength="40"></label>
+      <label>연락처<input name="phone" type="tel" maxlength="30"></label>
+      <label>사업자등록번호<input name="businessNumber" type="text" maxlength="30"></label>
+      <p id="client-form-error" role="alert"></p>
+      <div class="actions"><button type="button" class="secondary" data-close>취소</button><button type="submit">저장</button></div>
+    </form>
+  </dialog>
+  <dialog id="site-dialog" aria-labelledby="site-dialog-title">
+    <form id="site-form">
+      <div class="dialog-heading"><h2 id="site-dialog-title">현장 등록</h2><button type="button" class="quiet" data-close>닫기</button></div>
+      <input name="id" type="hidden">
+      <label>현장명<input name="name" type="text" required maxlength="60"></label>
+      <label>주소<input name="address" type="text" maxlength="120"></label>
+      <label>소속 거래처<select name="clientId" required></select></label>
+      <p id="site-form-error" role="alert"></p>
+      <div class="actions"><button type="button" class="secondary" data-close>취소</button><button type="submit">저장</button></div>
     </form>
   </dialog>
   <div id="toast" role="status" aria-live="polite"></div>

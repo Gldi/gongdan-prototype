@@ -1,4 +1,4 @@
-// 설치된 Edge로 화면 시안을 검증한다. 외부 패키지나 네트워크 서비스는 사용하지 않는다.
+// 설치된 Edge 또는 Chrome으로 화면 시안을 검증한다. 외부 패키지나 네트워크 서비스는 사용하지 않는다.
 const {spawn}=require('node:child_process');
 const fs=require('node:fs');
 const path=require('node:path');
@@ -6,10 +6,16 @@ const {pathToFileURL}=require('node:url');
 const assert=require('node:assert/strict');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const profile=fs.mkdtempSync(path.join(__dirname,'.browser-test-'));
-const edge=process.env.GONGDAN_EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const macBrowsers=[
+ '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+ '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+];
+const browser=process.env.GONGDAN_EDGE || (process.platform==='darwin'
+ ? macBrowsers.find(candidate=>fs.existsSync(candidate)) || macBrowsers[0]
+ : 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe');
 let child,ws;
 async function run(){
- child=spawn(edge,['--headless','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:'ignore',windowsHide:true});
+ child=spawn(browser,['--headless','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:'ignore',windowsHide:true});
  let spawnError;child.on('error',e=>spawnError=e);
  const portFile=path.join(profile,'DevToolsActivePort');
  for(let i=0;i<100&&!fs.existsSync(portFile);i++){if(spawnError)throw spawnError;await delay(100);}
@@ -61,6 +67,60 @@ async function run(){
  await evaluate('document.querySelector("[data-action=add]").click()');
  assert.equal(await evaluate('document.querySelector("#work-form").elements.worker.options.length'),3);
  await evaluate('document.querySelector("#close-dialog").click()');
+ await evaluate('location.hash="clients"');await delay(100);
+ async function clickRecord(kind,action,id){
+  const selector=`[data-record="${kind}"][data-action="${action}-record"]${id?`[data-id="${id}"]`:''}`;
+  await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+ }
+ async function submitRecord(kind,fields){
+  await evaluate(`{
+   const recordForm=document.querySelector("#${kind}-form");
+   for(const [field,value] of Object.entries(${JSON.stringify(fields)})) recordForm.elements[field].value=value;
+   recordForm.requestSubmit();
+  }`);
+ }
+ await clickRecord('client','add');
+ await submitRecord('client',{name:' '});
+ assert.match(await evaluate('document.querySelector("#client-form-error").textContent'),/거래처명을 입력/);
+ assert.equal(await evaluate('clients.length'),2);
+ await submitRecord('client',{name:'새 거래처',contact:'김 담당',phone:'02-123-4567',businessNumber:'123-45-67890'});
+ assert.match(await evaluate('document.querySelector("#content").textContent'),/김 담당.*02-123-4567.*123-45-67890/);
+ await clickRecord('client','edit','c3');
+ assert.equal(await evaluate('document.querySelector("#client-form").elements.name.value'),'새 거래처');
+ await submitRecord('client',{name:'수정한 거래처'});
+ assert.equal(await evaluate('clients[2].name'),'수정한 거래처');
+
+ await clickRecord('site','add');
+ await submitRecord('site',{name:' ',clientId:'c3'});
+ assert.match(await evaluate('document.querySelector("#site-form-error").textContent'),/현장명을 입력/);
+ assert.equal(await evaluate('sites.length'),2);
+ await submitRecord('site',{name:'새 현장',address:'서울시',clientId:'c3'});
+ assert.match(await evaluate('document.querySelector("#content section:last-child").textContent'),/서울시/);
+ await clickRecord('site','edit','s3');
+ assert.equal(await evaluate('document.querySelector("#site-form").elements.clientId.value'),'c3');
+ await submitRecord('site',{name:'수정한 현장',address:'인천시'});
+ assert.match(await evaluate('document.querySelector("#content section:last-child").textContent'),/인천시/);
+
+ async function workSiteOptions(){
+  await evaluate('location.hash="work"');await delay(100);
+  await evaluate('document.querySelector("[data-action=add]").click()');
+  const options=await evaluate('Array.from(document.querySelector("#work-form").elements.site.options, option=>[option.value,option.text])');
+  await evaluate('document.querySelector("#close-dialog").click()');
+  await evaluate('location.hash="clients"');await delay(100);
+  return options;
+ }
+ assert.deepEqual(await workSiteOptions(),[
+  ['s1','거래처 가 / 가 현장'],['s2','거래처 나 / 나 현장'],['s3','수정한 거래처 / 수정한 현장'],
+ ]);
+ await clickRecord('site','toggle','s2');
+ await clickRecord('client','toggle','c1');
+ assert.equal(await evaluate('sites[1].active'),false);
+ assert.equal(await evaluate('clients[0].active'),false);
+ assert.equal(await evaluate('sites[0].active'),true);
+ assert.deepEqual(await workSiteOptions(),[['s3','수정한 거래처 / 수정한 현장']]);
+ await evaluate('location.hash="work"');await delay(100);
+ assert.match(await evaluate('document.querySelector("#work-results").textContent'),/가 현장/);
+ assert.deepEqual(await evaluate('Array.from(document.querySelector("#filter-site").options, option=>option.value)'),['','s1','s2','s3']);
  assert.equal(await evaluate('document.documentElement.classList.contains("inverted")'),false);
  await evaluate('document.querySelector("#theme-toggle").click()');
  assert.equal(await evaluate('document.documentElement.classList.contains("inverted")'),true);
@@ -74,8 +134,11 @@ async function run(){
  for(const route of ['home','work','workers','clients','payroll','claims','settings']){await evaluate(`location.hash=${JSON.stringify(route)}`);await delay(80);assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'),true,`휴대폰 가로 넘침: ${route}`);}
  await call('Page.reload');await delay(300);
  assert.equal(await evaluate('entries.length'),3);
+ assert.equal(await evaluate('clients.length'),2);
+ assert.equal(await evaluate('sites.length'),2);
+ assert.equal(await evaluate('clients.every(c=>c.active) && sites.every(s=>s.active)'),true);
  assert.deepEqual(errors,[]);
- console.log('통과: 7개 메뉴, 작업 추가, 중복 차단, 필터, 급여 반영, 확정 차단, 근로자 등록·수정·비활성화, 색 반전 토글, 휴대폰 너비, 새로고침 초기화, 실행 오류 없음');
+ console.log('통과: 7개 메뉴, 작업 추가, 중복 차단, 필터, 급여 반영, 확정 차단, 근로자 등록·수정·비활성화, 거래처·현장 등록·빈 이름 검증·수정·비활성화·작업 선택 목록, 색 반전 토글, 휴대폰 너비, 새로고침 초기화, 실행 오류 없음');
  await call('Browser.close').catch(()=>{});
 }
 run().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{if(ws)ws.close();if(child&&child.exitCode===null){child.kill();await delay(700);}try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}catch{console.error(`검증용 프로필 정리 필요: ${profile}`);process.exitCode=1;}});
